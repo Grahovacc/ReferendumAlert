@@ -165,3 +165,30 @@ dist
 .env*
 !.env.example
 .wrangler/
+
+# Node / TypeScript
+node_modules/
+dist/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Cloudflare Workers
+.wrangler/
+worker-configuration.d.ts
+
+# Local env/secrets (never commit!)
+.env
+.env.*
+*.dev.vars
+
+# Editors / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Optional build/output
+coverage/
