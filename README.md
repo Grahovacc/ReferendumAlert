@@ -1,10 +1,6 @@
-# Referendum Alert (Cloudflare Worker + Telegram)
+# Referendum Alert
 
 Notifies a Telegram chat/group about new votes on Polkadot OpenGov referenda.
-
-- **D1** for subscriptions & watermarks (low writes)
-- **Subscan** as primary data source
-- Telegram webhook + cron poller
 
 ## Quick start
 
