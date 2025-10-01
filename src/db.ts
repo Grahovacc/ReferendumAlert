@@ -1,19 +1,15 @@
+// db.ts
 import type { Env } from './env';
 import type { Row } from './utils';
 
 export type Chain = 'dot' | 'ksm';
 
-export async function ensureSchema(env: Env) {
-	// legacy (no chain)
-	await env.DB.prepare(
-		`CREATE TABLE IF NOT EXISTS subs (
-      chat_id TEXT NOT NULL,
-      ref_id  INTEGER NOT NULL,
-      PRIMARY KEY (chat_id, ref_id)
-    );`
-	).run();
+async function tableExists(env: Env, name: string): Promise<boolean> {
+	const rs = await env.DB.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`).bind(name).all<Row>();
+	return !!(rs.results && rs.results[0]);
+}
 
-	// chain-aware subs
+export async function ensureSchema(env: Env) {
 	await env.DB.prepare(
 		`CREATE TABLE IF NOT EXISTS subs_v2 (
       chat_id TEXT NOT NULL,
@@ -23,21 +19,6 @@ export async function ensureSchema(env: Env) {
     );`
 	).run();
 
-	// migrate subs -> subs_v2 (assume polkadot)
-	await env.DB.prepare(
-		`INSERT OR IGNORE INTO subs_v2(chat_id, ref_id, chain)
-     SELECT chat_id, ref_id, 'dot' FROM subs`
-	).run();
-
-	// legacy watermark (no chain)
-	await env.DB.prepare(
-		`CREATE TABLE IF NOT EXISTS wm (
-      ref_id    INTEGER PRIMARY KEY,
-      since_sec INTEGER NOT NULL
-    );`
-	).run();
-
-	// chain-aware watermark
 	await env.DB.prepare(
 		`CREATE TABLE IF NOT EXISTS wm_v2 (
       ref_id    INTEGER NOT NULL,
@@ -47,13 +28,22 @@ export async function ensureSchema(env: Env) {
     );`
 	).run();
 
-	// migrate wm -> wm_v2 (assume polkadot)
-	await env.DB.prepare(
-		`INSERT OR IGNORE INTO wm_v2(ref_id, chain, since_sec)
-     SELECT ref_id, 'dot', since_sec FROM wm`
-	).run();
+	if (await tableExists(env, 'subs')) {
+		await env.DB.prepare(
+			`INSERT OR IGNORE INTO subs_v2(chat_id, ref_id, chain)
+       SELECT chat_id, ref_id, 'dot' FROM subs`
+		).run();
+		await env.DB.prepare(`DROP TABLE IF EXISTS subs`).run();
+	}
 
-	// identities cache
+	if (await tableExists(env, 'wm')) {
+		await env.DB.prepare(
+			`INSERT OR IGNORE INTO wm_v2(ref_id, chain, since_sec)
+       SELECT ref_id, 'dot', since_sec FROM wm`
+		).run();
+		await env.DB.prepare(`DROP TABLE IF EXISTS wm`).run();
+	}
+
 	await env.DB.prepare(
 		`CREATE TABLE IF NOT EXISTS identities (
       addr    TEXT PRIMARY KEY,
@@ -63,7 +53,6 @@ export async function ensureSchema(env: Env) {
 	).run();
 }
 
-/* subs (chain-aware) */
 export async function addWatch(env: Env, chatId: string, refId: number, chain: Chain) {
 	await env.DB.prepare(`INSERT OR IGNORE INTO subs_v2(chat_id, ref_id, chain) VALUES(?,?,?)`).bind(chatId, refId, chain).run();
 }
@@ -74,6 +63,16 @@ export async function removeWatch(env: Env, chatId: string, refId: number, chain
 	} else {
 		await env.DB.prepare(`DELETE FROM subs_v2 WHERE chat_id=? AND ref_id=?`).bind(chatId, refId).run();
 	}
+	if (await tableExists(env, 'subs')) {
+		await env.DB.prepare(`DELETE FROM subs WHERE chat_id=? AND ref_id=?`).bind(chatId, refId).run();
+	}
+}
+
+export async function clearChat(env: Env, chatId: string) {
+	await env.DB.prepare(`DELETE FROM subs_v2 WHERE chat_id=?`).bind(chatId).run();
+	if (await tableExists(env, 'subs')) {
+		await env.DB.prepare(`DELETE FROM subs WHERE chat_id=?`).bind(chatId).run();
+	}
 }
 
 export async function listWatchesForChat(env: Env, chatId: string): Promise<Array<{ ref_id: number; chain: Chain }>> {
@@ -81,7 +80,6 @@ export async function listWatchesForChat(env: Env, chatId: string): Promise<Arra
 	return (rs.results || []).map((r) => ({ ref_id: Number(r.ref_id), chain: (r.chain as Chain) || 'dot' }));
 }
 
-/** Returns distinct (ref_id, chain) with list of chats */
 export async function refsToChats(env: Env): Promise<Array<{ ref_id: number; chain: Chain; chats: string[] }>> {
 	const rs = await env.DB.prepare(`SELECT ref_id, chain, chat_id FROM subs_v2`).all<Row>();
 	const map = new Map<string, { ref_id: number; chain: Chain; chats: string[] }>();
@@ -95,7 +93,6 @@ export async function refsToChats(env: Env): Promise<Array<{ ref_id: number; cha
 	return [...map.values()];
 }
 
-/* watermark (chain-aware) */
 export async function getSince(env: Env, refId: number, chain: Chain): Promise<number> {
 	const rs = await env.DB.prepare(`SELECT since_sec FROM wm_v2 WHERE ref_id=? AND chain=?`).bind(refId, chain).all<Row>();
 	const row = rs.results && rs.results[0];
@@ -111,13 +108,13 @@ export async function setSince(env: Env, refId: number, chain: Chain, tsSec: num
 		.run();
 }
 
-/* identities cache */
 export async function getCachedIdentity(env: Env, addr: string) {
 	const rs = await env.DB.prepare(`SELECT display, ts_sec FROM identities WHERE addr=?`).bind(addr).all<Row>();
 	const row = rs.results && rs.results[0];
 	if (!row) return null;
 	return { display: (row.display as string) ?? null, ts: Number(row.ts_sec) || 0 };
 }
+
 export async function putCachedIdentity(env: Env, addr: string, display: string | null) {
 	const now = Math.floor(Date.now() / 1000);
 	await env.DB.prepare(

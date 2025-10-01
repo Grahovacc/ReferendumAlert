@@ -1,3 +1,4 @@
+// sources.ts
 import type { Env } from './env';
 import type { Chain } from './db';
 
@@ -6,7 +7,6 @@ export type VoteRow = { dir: 'aye' | 'nay' | 'abstain'; addr: string; amt: any; 
 async function fetchVotesFromSubscan(chain: Chain, refId: number, apiKey?: string): Promise<VoteRow[]> {
 	if (!apiKey) return [];
 	const host = chain === 'dot' ? 'https://polkadot.api.subscan.io' : 'https://kusama.api.subscan.io';
-
 	const resp = await fetch(`${host}/api/scan/referenda/votes`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
@@ -33,7 +33,6 @@ async function fetchVotesFromSubscan(chain: Chain, refId: number, apiKey?: strin
 
 async function fetchVotesFromPolkassembly(chain: Chain, refId: number): Promise<VoteRow[]> {
 	const host = chain === 'dot' ? 'https://polkadot.polkassembly.io' : 'https://kusama.polkassembly.io';
-
 	const resp = await fetch(`${host}/api/v1/votes/history`, {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json', 'x-network': chain === 'dot' ? 'polkadot' : 'kusama' },
@@ -67,14 +66,10 @@ export async function getRecentVotes(env: Env, chain: Chain, refId: number): Pro
 	try {
 		const ss = await fetchVotesFromSubscan(chain, refId, env.SUBSCAN_API_KEY);
 		if (ss.length) return ss;
-	} catch (e) {
-		console.error('Subscan fetch error', chain, e);
-	}
+	} catch {}
 	try {
 		const pa = await fetchVotesFromPolkassembly(chain, refId);
 		if (pa.length) return pa;
-	} catch (e) {
-		console.error('Polkassembly fetch error', chain, e);
-	}
+	} catch {}
 	return [];
 }

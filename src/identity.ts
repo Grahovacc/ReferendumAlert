@@ -1,10 +1,10 @@
+// identity.ts
 import type { Env } from './env';
 import { ensureSchema, getCachedIdentity, putCachedIdentity } from './db';
 
 const SUBSCAN_HOSTS = [
 	'https://polkadot.api.subscan.io',
 	'https://kusama.api.subscan.io',
-	// People chains (many identities migrated here)
 	'https://people-polkadot.api.subscan.io',
 	'https://people-kusama.api.subscan.io',
 ];
@@ -42,15 +42,12 @@ async function fetchIdentityDisplay(env: Env, addr: string): Promise<string | nu
 	return null;
 }
 
-/** Admin override table (optional, used if present) */
 async function getLocalOverride(env: Env, addr: string): Promise<string | null> {
 	await env.DB.prepare(
-		`
-    CREATE TABLE IF NOT EXISTS identities_override (
+		`CREATE TABLE IF NOT EXISTS identities_override (
       addr TEXT PRIMARY KEY,
       display TEXT NOT NULL
-    );
-  `
+    );`
 	).run();
 	const rs = await env.DB.prepare(`SELECT display FROM identities_override WHERE addr=?`).bind(addr).all();
 	const row = rs.results && rs.results[0];
@@ -59,20 +56,12 @@ async function getLocalOverride(env: Env, addr: string): Promise<string | null> 
 
 export async function resolveIdentityDisplay(env: Env, addr: string): Promise<string | null> {
 	await ensureSchema(env);
-
-	// 1) local override
 	const manual = await getLocalOverride(env, addr);
 	if (manual) return manual;
-
-	// 2) cached
 	const cached = await getCachedIdentity(env, addr);
 	const now = Math.floor(Date.now() / 1000);
 	if (cached && now - cached.ts < IDENTITY_TTL_SEC) return cached.display || null;
-
-	// 3) network (Relay+People)
 	const fresh = await fetchIdentityDisplay(env, addr);
-
-	// 4) cache (including null)
 	await putCachedIdentity(env, addr, fresh);
 	return fresh;
 }

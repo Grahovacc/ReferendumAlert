@@ -1,7 +1,8 @@
+// commands.ts
 import type { Env } from './env';
 import { tgSend } from './telegram';
 import { cleanId } from './utils';
-import { ensureSchema, addWatch, removeWatch, listWatchesForChat, setSince, Chain } from './db';
+import { ensureSchema, addWatch, removeWatch, listWatchesForChat, setSince, Chain, clearChat } from './db';
 
 const CHAIN_HINT = `<i>Chain:</i> <code>dot</code> = Polkadot, <code>ksm</code> = Kusama.`;
 const EXAMPLES = `Examples:
@@ -37,8 +38,6 @@ function normChain(x?: string | null): Chain | null {
 function parseWatchArgs(raw: string): { id: number; chain: Chain } | null {
 	const s = raw.trim();
 	if (!s) return null;
-
-	// dot:1759 / ksm:321 styles
 	const colon = s.match(/^(dot|ksm)\s*:\s*(\d+)$/i);
 	if (colon) {
 		const chain = normChain(colon[1])!;
@@ -46,8 +45,6 @@ function parseWatchArgs(raw: string): { id: number; chain: Chain } | null {
 		if (!id) return null;
 		return { id, chain };
 	}
-
-	// "1759 ksm" or "1759 dot"
 	const parts = s.split(/\s+/);
 	const id = Number(parts[0]);
 	if (!id) return null;
@@ -57,28 +54,23 @@ function parseWatchArgs(raw: string): { id: number; chain: Chain } | null {
 
 export async function handleCommand(env: Env, update: any) {
 	await ensureSchema(env);
-
 	const msg = (update?.message ?? update?.channel_post) as any;
 	const chatId = String(msg?.chat?.id ?? '');
 	const rawText = String(msg?.text || '').trim();
 	if (!chatId || !rawText) return;
-
 	const [rawCmd, ...rest] = rawText.split(/\s+/);
 	const cmdOnly = rawCmd.replace(/@.+$/, '').toLowerCase();
 	const argRaw = rest.join(' ').trim();
 	const argClean = cleanId(argRaw);
-
 	try {
 		if (cmdOnly === '/start' || cmdOnly === '/help' || cmdOnly === '/commands') {
 			await tgSend(env, chatId, HELP_TEXT);
 			return;
 		}
-
 		if (cmdOnly === '/id') {
 			await tgSend(env, chatId, `This chat id: <code>${chatId}</code>`);
 			return;
 		}
-
 		if (cmdOnly === '/watch' || cmdOnly === '/watchdot' || cmdOnly === '/watchksm') {
 			let parsed = parseWatchArgs(argRaw);
 			if (cmdOnly === '/watchdot') {
@@ -89,7 +81,6 @@ export async function handleCommand(env: Env, update: any) {
 				const id = Number(argClean);
 				parsed = id ? { id, chain: 'ksm' } : null;
 			}
-
 			if (!parsed) {
 				await tgSend(env, chatId, `Usage: <code>/watch &lt;id&gt; [dot|ksm]</code>\n${EXAMPLES}`);
 				return;
@@ -100,9 +91,7 @@ export async function handleCommand(env: Env, update: any) {
 			await tgSend(env, chatId, `✅ Watching #${id} (${chain})`);
 			return;
 		}
-
 		if (cmdOnly === '/unwatch') {
-			// supports: "/unwatch 1759", "/unwatch 321 ksm"
 			const parts = argRaw.trim().split(/\s+/).filter(Boolean);
 			const id = Number(parts[0]);
 			const chain = normChain(parts[1] || null);
@@ -114,7 +103,6 @@ export async function handleCommand(env: Env, update: any) {
 			await tgSend(env, chatId, chain ? `🗑️ Unwatched #${id} (${chain})` : `🗑️ Unwatched #${id} (dot & ksm)`);
 			return;
 		}
-
 		if (cmdOnly === '/list') {
 			const refs = await listWatchesForChat(env, chatId);
 			if (!refs.length) {
@@ -125,13 +113,11 @@ export async function handleCommand(env: Env, update: any) {
 			await tgSend(env, chatId, text);
 			return;
 		}
-
 		if (cmdOnly === '/clear') {
-			await env.DB.prepare(`DELETE FROM subs_v2 WHERE chat_id=?`).bind(chatId).run();
+			await clearChat(env, chatId);
 			await tgSend(env, chatId, `🧹 Cleared all subscriptions for this chat (dot & ksm).`);
 			return;
 		}
-
 		if (cmdOnly.startsWith('/')) {
 			await tgSend(env, chatId, `🤖 Unknown command: <code>${rawCmd}</code>\n\n${HELP_TEXT}`);
 		}

@@ -1,8 +1,9 @@
+// env.ts
 export interface Env {
-	TELEGRAM_TOKEN: string; // wrangler secret
-	WEBHOOK_SECRET: string; // wrangler secret (use same when setting webhook)
-	SUBSCAN_API_KEY?: string; // wrangler secret
-	DB: D1Database; // D1 binding named "DB"
+	TELEGRAM_TOKEN: string;
+	WEBHOOK_SECRET: string;
+	SUBSCAN_API_KEY?: string;
+	DB: D1Database;
 }
 
 export const BOT_API = (env: Env) => `https://api.telegram.org/bot${env.TELEGRAM_TOKEN}`;

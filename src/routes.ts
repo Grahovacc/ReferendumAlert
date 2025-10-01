@@ -1,3 +1,4 @@
+// routes.ts
 import type { Env } from './env';
 import { tgSend, tgSetMyCommands } from './telegram';
 import { fmtVoteText } from './format';
@@ -16,14 +17,12 @@ export async function handleWebhook(req: Request, env: Env) {
 	return new Response('ok');
 }
 
-/* scheduler loop: iterate distinct (ref,chain) */
 export async function notifyNewVotes(env: Env) {
 	await ensureSchema(env);
 	const pairs = await refsToChats(env);
 	for (const { ref_id, chain, chats } of pairs) {
 		const last = await getSince(env, ref_id, chain);
 		const votes = await getRecentVotes(env, chain, ref_id);
-
 		const fresh = votes
 			.map((v) => {
 				const raw = typeof v.ts === 'number' ? v.ts : Number(v.ts) || 0;
@@ -32,20 +31,16 @@ export async function notifyNewVotes(env: Env) {
 			})
 			.sort((a, b) => (a.ts as number) - (b.ts as number))
 			.filter((v) => (v.ts as number) > last);
-
 		if (!fresh.length) continue;
-
 		for (const v of fresh) {
 			const text = await fmtVoteText(env, ref_id, v);
 			await Promise.all(chats.map((c) => tgSend(env, c, text)));
 		}
-
 		const newest = fresh[fresh.length - 1].ts as number;
 		await setSince(env, ref_id, chain, newest);
 	}
 }
 
-/* admin routes (guard with key in index.ts) */
 export async function debugSubs(env: Env) {
 	await ensureSchema(env);
 	const rs = await env.DB.prepare(`SELECT chat_id, ref_id, chain FROM subs_v2 ORDER BY chat_id, chain, ref_id`).all<Row>();
@@ -55,7 +50,6 @@ export async function debugSubs(env: Env) {
 export async function notifyDummy(env: Env, url: URL) {
 	const chat = url.searchParams.get('chat');
 	if (!chat) return new Response('chat required', { status: 400 });
-
 	const ref = Number(url.searchParams.get('ref') || '1759');
 	const type = (url.searchParams.get('type') || 'aye') as 'aye' | 'nay' | 'abstain';
 	const addr = url.searchParams.get('addr') || '16CwBowmC6fNyvBGwtZwoKFu8PDjTbd1pMovQRx2UyjhJArK';
@@ -111,7 +105,6 @@ export async function setCommands(env: Env) {
 	return new Response('commands set');
 }
 
-/** Optional: admin identity override */
 export async function setIdentityOverride(env: Env, url: URL) {
 	const addr = url.searchParams.get('addr');
 	const display = url.searchParams.get('display');
