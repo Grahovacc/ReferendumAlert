@@ -1,49 +1,52 @@
-🗳️ Referendum Alert Bot
+# 🗳️ Referendum Alert Bot
 
-A lightweight Telegram bot that sends instant alerts when someone votes on a Polkadot or Kusama referendum. Perfect for governance watchers, delegations, researchers, and on-chain communities.
+A Telegram bot that sends **instant notifications** when someone votes on a **Polkadot or Kusama** referendum. Designed for governance participants, analysts, DAOs, and on-chain communities.
 
-✅ What It Does
+---
 
-⏱ Real-time notifications for new votes (Aye, Nay, or Abstain)
+## ✅ Features
 
-🌐 Supports both Polkadot & Kusama
+- 🔔 Real-time alerts for new votes (Aye / Nay / Abstain)
+- 🌐 Supports **Polkadot** and **Kusama**
+- 👥 Works in **private chats** and **groups**
+- 🔍 Track any referendum by ID
+- 📊 Shows conviction, voting power, address, timestamp
 
-👥 Works in private chats and group chats
+---
 
-🔢 Track any referendum by ID
+## 🛠 Commands
 
-🧾 Shows voter address, conviction, voting power, and timestamp
+```bash
+/watch <id> [dot|ksm]     # Start watching a referendum
+/watchdot <id>            # Watch on Polkadot
+/watchksm <id>            # Watch on Kusama
+/unwatch <id> [dot|ksm]   # Stop tracking a referendum
+/list                     # Show all active watches
+/clear                    # Unsubscribe from everything
+/help                     # Command overview
+Examples:
 
-🚀 Commands
-/watch <id> [dot|ksm]   – Start watching a referendum  
-/watchdot <id>          – Watch on Polkadot  
-/watchksm <id>          – Watch on Kusama  
-/unwatch <id> [dot|ksm] – Stop tracking  
-/list                   – Show what you're watching  
-/clear                  – Unsubscribe from everything  
-/help                   – Show command info
-
-
-Example:
-
+bash
+Copy code
 /watch 1759 dot
 /watchksm 2100
+/unwatch 1759
+🌐 Tech Stack
+Cloudflare Workers (serverless backend)
 
-🔧 Tech Stack
+D1 (Cloudflare SQLite) for storage
 
-Cloudflare Workers (serverless runtime)
-
-D1 (SQLite) for subscriptions + watchdog state
-
-Subscan API for blockchain data
+Subscan API for vote data
 
 Telegram Bot API for messaging
 
-📦 Setup (Self-Host)
+🚀 Self-Hosting Setup
+bash
+Copy code
 # 1. Install dependencies
 npm install
 
-# 2. Add secrets (do NOT commit these)
+# 2. Add required secrets (do NOT commit these)
 npx wrangler secret put TELEGRAM_TOKEN
 npx wrangler secret put WEBHOOK_SECRET
 npx wrangler secret put SUBSCAN_API_KEY
@@ -63,5 +66,18 @@ CREATE TABLE IF NOT EXISTS wm (
 );
 "
 
-# 4. Deploy to Cloudflare
+# 4. Deploy to Cloudflare Workers
 npx wrangler deploy
+📌 Why Use It?
+Track whale governance activity
+
+Monitor your own referenda proposals
+
+Follow treasury and OpenGov movements
+
+Use in group chats for community oversight
+
+🔗 Links
+GitHub: https://github.com/your-repo-here
+Telegram Bot: https://t.me/your-bot-link
+Landing Page (optional): https://your-site.com
