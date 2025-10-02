@@ -5,10 +5,10 @@ import { ensureSchema, addWatch, removeWatch, listWatchesForChat, setSince, Chai
 
 const CHAIN_HINT = `<i>Chain:</i> <code>dot</code> = Polkadot, <code>ksm</code> = Kusama.`;
 const EXAMPLES = `Examples:
-• <code>/watch 1759</code> (defaults to dot)
-• <code>/watch 321 ksm</code>
-• <code>/watch dot:1759</code> or <code>/watch ksm:321</code>
-• <code>/watchdot 1759</code> or <code>/watchksm 321</code>`;
+• <code>/watch 1702</code> (defaults to dot)
+• <code>/watch 581 ksm</code>
+• <code>/watch dot:1702</code> or <code>/watch ksm:581</code>
+• <code>/watchdot 1702</code> or <code>/watchksm 581</code>`;
 
 export const HELP_TEXT = `👋 <b>Referendum Alert — OpenGov vote notifier</b>
 

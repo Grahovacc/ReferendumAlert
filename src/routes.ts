@@ -67,7 +67,7 @@ export async function debugSubs(env: Env) {
 export async function notifyDummy(env: Env, url: URL) {
 	const chat = url.searchParams.get('chat');
 	if (!chat) return new Response('chat required', { status: 400 });
-	const ref = Number(url.searchParams.get('ref') || '1759');
+	const ref = Number(url.searchParams.get('ref') || '1702');
 	const type = (url.searchParams.get('type') || 'aye') as 'aye' | 'nay' | 'abstain';
 	const addr = url.searchParams.get('addr') || '16CwBowmC6fNyvBGwtZwoKFu8PDjTbd1pMovQRx2UyjhJArK';
 	const chain: Chain = url.searchParams.get('chain')?.toLowerCase() === 'ksm' ? 'ksm' : 'dot';
@@ -90,7 +90,7 @@ export function diag(env: Env) {
 }
 
 export async function peek(env: Env, url: URL) {
-	const ref = Number(url.searchParams.get('ref') || '1759');
+	const ref = Number(url.searchParams.get('ref') || '1702');
 	const chain = (url.searchParams.get('chain')?.toLowerCase() === 'ksm' ? 'ksm' : 'dot') as Chain;
 	await ensureSchema(env);
 	const last = await getSince(env, ref, chain);
