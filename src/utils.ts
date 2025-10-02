@@ -1,4 +1,3 @@
-// utils.ts
 export const shortAddr = (s: string) => (!s ? 'unknown' : s.length > 12 ? `${s.slice(0, 6)}…${s.slice(-6)}` : s);
 
 export function toDOT(raw: any) {

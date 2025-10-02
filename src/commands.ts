@@ -1,4 +1,3 @@
-// commands.ts
 import type { Env } from './env';
 import { tgSend } from './telegram';
 import { cleanId } from './utils';

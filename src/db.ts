@@ -1,4 +1,3 @@
-// db.ts
 import type { Env } from './env';
 import type { Row } from './utils';
 
@@ -123,4 +122,9 @@ export async function putCachedIdentity(env: Env, addr: string, display: string 
 	)
 		.bind(addr, display, now)
 		.run();
+}
+
+/** NEW: allow purging the cache for one address for debugging. */
+export async function deleteCachedIdentity(env: Env, addr: string) {
+	await env.DB.prepare(`DELETE FROM identities WHERE addr=?`).bind(addr).run();
 }

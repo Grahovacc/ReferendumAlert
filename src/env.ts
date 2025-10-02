@@ -1,4 +1,3 @@
-// env.ts
 export interface Env {
 	TELEGRAM_TOKEN: string;
 	WEBHOOK_SECRET: string;

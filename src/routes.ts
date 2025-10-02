@@ -1,10 +1,11 @@
-// routes.ts
 import type { Env } from './env';
 import { tgSend, tgSetMyCommands } from './telegram';
 import { fmtVoteText } from './format';
-import { ensureSchema, refsToChats, getSince, setSince, Chain } from './db';
+import { ensureSchema, refsToChats, getSince, setSince, Chain, deleteCachedIdentity } from './db';
 import { getRecentVotes } from './sources';
+import type { VoteRow } from './sources';
 import { Row, toDOT } from './utils';
+import { debugIdentityLookup } from './identity';
 
 export async function handleWebhook(req: Request, env: Env) {
 	if (req.headers.get('X-Telegram-Bot-Api-Secret-Token') !== env.WEBHOOK_SECRET) return new Response('unauthorized', { status: 401 });
@@ -15,6 +16,19 @@ export async function handleWebhook(req: Request, env: Env) {
 		await handleCommand(env, update);
 	}
 	return new Response('ok');
+}
+
+function squashDelegations(votes: VoteRow[]): VoteRow[] {
+	const seen = new Set<string>();
+	const out: VoteRow[] = [];
+	for (const v of votes) {
+		const ts = typeof v.ts === 'number' ? v.ts : Number(v.ts) || 0;
+		const key = `${v.delegate || v.addr}|${v.dir}|${ts}`;
+		if (seen.has(key)) continue;
+		seen.add(key);
+		out.push(v);
+	}
+	return out;
 }
 
 export async function notifyNewVotes(env: Env) {
@@ -31,12 +45,15 @@ export async function notifyNewVotes(env: Env) {
 			})
 			.sort((a, b) => (a.ts as number) - (b.ts as number))
 			.filter((v) => (v.ts as number) > last);
-		if (!fresh.length) continue;
-		for (const v of fresh) {
-			const text = await fmtVoteText(env, ref_id, v);
+
+		const squashed = squashDelegations(fresh);
+		if (!squashed.length) continue;
+
+		for (const v of squashed) {
+			const text = await fmtVoteText(env, ref_id, v, chain);
 			await Promise.all(chats.map((c) => tgSend(env, c, text)));
 		}
-		const newest = fresh[fresh.length - 1].ts as number;
+		const newest = squashed[squashed.length - 1].ts as number;
 		await setSince(env, ref_id, chain, newest);
 	}
 }
@@ -53,8 +70,10 @@ export async function notifyDummy(env: Env, url: URL) {
 	const ref = Number(url.searchParams.get('ref') || '1759');
 	const type = (url.searchParams.get('type') || 'aye') as 'aye' | 'nay' | 'abstain';
 	const addr = url.searchParams.get('addr') || '16CwBowmC6fNyvBGwtZwoKFu8PDjTbd1pMovQRx2UyjhJArK';
+	const chain: Chain = url.searchParams.get('chain')?.toLowerCase() === 'ksm' ? 'ksm' : 'dot';
+
 	const v = { dir: type, addr, amt: '123400000000', conv: 'Locked1x', ts: Math.floor(Date.now() / 1000) };
-	const text = await fmtVoteText(env, ref, v);
+	const text = await fmtVoteText(env, ref, v, chain);
 	await tgSend(env, chat, text);
 	return new Response('dummy sent');
 }
@@ -78,7 +97,7 @@ export async function peek(env: Env, url: URL) {
 	const votes = await getRecentVotes(env, chain, ref);
 	const latest = votes.slice(0, 5).map((v) => ({
 		dir: v.dir,
-		addr: v.addr,
+		addr: (v as VoteRow).delegate || v.addr,
 		amt: toDOT(v.amt),
 		ts: Number(v.ts || 0),
 	}));
@@ -94,9 +113,7 @@ export async function peek(env: Env, url: URL) {
 			null,
 			2
 		),
-		{
-			headers: { 'content-type': 'application/json' },
-		}
+		{ headers: { 'content-type': 'application/json' } }
 	);
 }
 
@@ -105,25 +122,41 @@ export async function setCommands(env: Env) {
 	return new Response('commands set');
 }
 
+/** Admin: set/override a display name for one address. */
 export async function setIdentityOverride(env: Env, url: URL) {
 	const addr = url.searchParams.get('addr');
 	const display = url.searchParams.get('display');
 	if (!addr || !display) return new Response('addr & display are required', { status: 400 });
 	await env.DB.prepare(
-		`
-    CREATE TABLE IF NOT EXISTS identities_override (
+		`CREATE TABLE IF NOT EXISTS identities_override (
       addr TEXT PRIMARY KEY,
       display TEXT NOT NULL
-    );
-  `
+    );`
 	).run();
 	await env.DB.prepare(
-		`
-    INSERT INTO identities_override(addr, display) VALUES(?,?)
-    ON CONFLICT(addr) DO UPDATE SET display=excluded.display
-  `
+		`INSERT INTO identities_override(addr, display) VALUES(?,?)
+     ON CONFLICT(addr) DO UPDATE SET display=excluded.display`
 	)
 		.bind(addr, display)
 		.run();
+	return new Response('ok');
+}
+
+/** Debug: try all hosts for an address and show parsed result. */
+export async function debugIdentity(env: Env, url: URL) {
+	const addr = url.searchParams.get('addr') || '';
+	const chain = (url.searchParams.get('chain')?.toLowerCase() === 'ksm' ? 'ksm' : 'dot') as Chain;
+	if (!addr) return new Response('addr required', { status: 400 });
+	const res = await debugIdentityLookup(env, addr, chain);
+	return new Response(JSON.stringify({ addr, chain, ...res }, null, 2), {
+		headers: { 'content-type': 'application/json' },
+	});
+}
+
+/** Admin: purge an address from identity cache. */
+export async function purgeIdentityCache(env: Env, url: URL) {
+	const addr = url.searchParams.get('addr') || '';
+	if (!addr) return new Response('addr required', { status: 400 });
+	await deleteCachedIdentity(env, addr);
 	return new Response('ok');
 }

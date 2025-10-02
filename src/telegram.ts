@@ -1,4 +1,3 @@
-// telegram.ts
 import { BOT_API, HEADERS_JSON, Env } from './env';
 
 export async function tgSend(env: Env, chatId: string, text: string) {
